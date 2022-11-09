@@ -24,6 +24,7 @@ public class report {
 	private JTable table2;
 	private JTable table3;
 	private JTable table4;
+	private JTable table5;
 	private int year = 0;
 	User usr = login.getUsr();
 	public JFrame getFrame() {
@@ -75,6 +76,20 @@ public class report {
 		return previousMonth;
 	}
 	
+	public int getPrevious2(int month) {
+		int previousMonth;
+		
+		if(month == 1) {
+			previousMonth = 10;
+			setYear(-1);
+		}
+		else
+		{
+			previousMonth = -2;
+		}
+		return previousMonth;
+	}
+	
 	public int getYear() {
 		return year; 
 	}
@@ -113,9 +128,14 @@ public class report {
 		
 		//SELECT sum(spending_amount) FROM spending WHERE user_id = 1 AND EXTRACT(MONTH FROM date)=(EXTRACT(MONTH FROM now())-1);
 		//SELECT sum(spending_amount) FROM spending WHERE user_id = 1 AND EXTRACT(MONTH FROM date)=EXTRACT(MONTH FROM now());
-		//SELECT categories.budget,SUM(spending.spending_amount) FROM spending 
+		
+		//SELECT categories.name,SUM(spending.spending_amount),categories.budget FROM spending 
 		//LEFT JOIN categories ON spending.category_id = categories.categoryID WHERE spending.user_id = 1 
-		//GROUP BY categories.budget HAVING SUM(spending.spending_amount) >=(categories.budget * 0.90);
+		//AND EXTRACT(MONTH FROM spending.date) BETWEEN (EXTRACT(MONTH FROM NOW())+('"+getPrevious2(getCurrentMonth())+"')) AND EXTRACT(MONTH FROM NOW()) 
+		//AND EXTRACT(YEAR FROM spending.date) BETWEEN (EXTRACT(YEAR FROM NOW())+('"+getYear+"')) AND EXTRACT(YEAR FROM NOW()) 
+		//GROUP BY categories.budget,categories.name HAVING SUM(spending.spending_amount) >=(categories.budget * 0.90) 
+		//ORDER BY SUM(spending.spending_amount) DESC;
+
 		JScrollPane scrollPane = new JScrollPane();
 		scrollPane.setBounds(26, 70, 220, 46);
 		scrollPane.setBackground(new Color(255, 116, 0));
@@ -132,6 +152,9 @@ public class report {
 		
 		DefaultTableModel model4 = new DefaultTableModel();
 		Object column4 [] = {"Current Month","Previous Month"};
+		
+		DefaultTableModel model5 = new DefaultTableModel();
+		Object column5 [] = {"Category","Spending", "Budget"};
 		
 		table = new JTable();
 		table.setModel(model);
@@ -194,6 +217,7 @@ public class report {
 		scrollPane4.setViewportView(table4);
 		
 		JLabel comparisonLabel = DefaultComponentFactory.getInstance().createLabel("Comparison");
+		comparisonLabel.setFont(new Font("Microsoft Sans Serif", Font.PLAIN, 13));
 		comparisonLabel.setBounds(64, 6, 120, 16);
 		panel.add(comparisonLabel);
 		
@@ -201,6 +225,24 @@ public class report {
 		reportLabel.setFont(new Font("Microsoft Sans Serif", Font.BOLD, 18));
 		reportLabel.setBounds(276, 6, 133, 21);
 		frame.getContentPane().add(reportLabel);
+		
+		JScrollPane scrollPane5 = new JScrollPane();
+		scrollPane5.setBackground(new Color(255, 116, 0));
+		scrollPane5.setBounds(391, 189, 220, 129);
+		frame.getContentPane().add(scrollPane5);
+		
+		table5 = new JTable();
+		table5.setModel(model5);
+		table5.setBackground(new Color(255, 116, 0));
+		table5.setBounds(90, 90, 90, 90);
+		model5.setColumnIdentifiers(column5);
+		scrollPane5.setViewportView(table5);
+		
+		
+		JLabel rankLabel = new JLabel("Top 3 Categories at 90% of budget");
+		rankLabel.setFont(new Font("Microsoft Sans Serif", Font.PLAIN, 13));
+		rankLabel.setBounds(391, 171, 220, 16);
+		frame.getContentPane().add(rankLabel);
 		
 	
 		
@@ -335,14 +377,51 @@ public class report {
 		             Double spending = rs_spending.getDouble("sum(spending_amount)");
 		             Double budgetC = rs_budgetC.getDouble("sum(budget)");
 		             Double spendingC = rs_spendingC.getDouble("sum(spending_amount)");
-		             Double difference = (spending.doubleValue() - budget.doubleValue()); 
-		             Double differenceC = (spendingC.doubleValue() - budgetC.doubleValue());
+		             Double difference = (double) Math.round(spending.doubleValue() - budget.doubleValue()); 
+		             Double differenceC = (double) Math.round(spendingC.doubleValue() - budgetC.doubleValue());
 		             String previousMonth = String.valueOf(difference);
 		             String currentMonth = String.valueOf(differenceC);
 	             
 	            String data [] = {currentMonth,previousMonth};
 	           
 	            DefaultTableModel tbModel =(DefaultTableModel)table4.getModel();
+	          
+	            
+	            tbModel.addRow(data);
+	            }
+	            MyConnection.getConnection().close();
+	  
+	       } catch (SQLException ex){
+	    	   System.out.print(ex);
+	       }
+		 //
+		 try{
+
+				
+				Statement stmt = MyConnection.getConnection().createStatement();
+				
+				
+	            String query= "SELECT categories.name,SUM(spending.spending_amount),categories.budget FROM spending "
+	            		+ "LEFT JOIN categories ON spending.category_id = categories.categoryID WHERE spending.user_id = '"+usr.getId()+"' "
+	            		+ "AND EXTRACT(MONTH FROM spending.date) BETWEEN (EXTRACT(MONTH FROM NOW())+('"+getPrevious2(getCurrentMonth())+"')) "
+	            				+ "AND EXTRACT(MONTH FROM NOW()) AND EXTRACT(YEAR FROM spending.date) BETWEEN (EXTRACT(YEAR FROM NOW())+('"+getYear()+"')) "
+	            						+ "AND EXTRACT(YEAR FROM NOW()) "
+	            						+ "GROUP BY categories.budget,categories.name HAVING SUM(spending.spending_amount) >=(categories.budget * 0.90) "
+	            						+ "ORDER BY SUM(spending.spending_amount) DESC LIMIT 3";
+	          
+	      	 
+	      	    ResultSet rs_spending =  stmt.executeQuery(query);
+	            while(rs_spending.next()) {
+	            
+	           
+	             String category = rs_spending.getString("name");
+	             
+	             String spending = String.valueOf(rs_spending.getDouble("SUM(spending.spending_amount)"));
+	             String budget = String.valueOf(rs_spending.getDouble("budget")); 
+	             
+	            String data [] = {category,spending,budget};
+	           
+	            DefaultTableModel tbModel =(DefaultTableModel)table5.getModel();
 	          
 	            
 	            tbModel.addRow(data);
